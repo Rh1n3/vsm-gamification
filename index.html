@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Симулятор Проводника ВСМ</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a2a6c; color: #fff; padding: 20px; display: flex; justify-content: center; }
+        .app-container { width: 600px; background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); box-shadow: 0 8px 32px 0 rgba(0,0,0,0.3); }
+        h2 { border-bottom: 2px solid #ff4b2b; padding-bottom: 10px; margin-top: 0; }
+        .stats { display: flex; justify-content: space-between; margin-bottom: 20px; background: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; }
+        .stat-bar-bg { width: 100px; background: #444; height: 12px; border-radius: 6px; display: inline-block; margin-left: 5px; overflow: hidden;}
+        .stat-bar-fill { background: #ff4b2b; height: 100%; transition: width 0.5s; }
+        #timer { font-size: 24px; color: #ff4b2b; font-weight: bold; text-align: center; margin: 15px 0; }
+        .quest-text { font-size: 18px; line-height: 1.5; margin-bottom: 25px; min-height: 80px; }
+        .btn-option { display: block; width: 100%; background: #3a7bd5; color: white; border: none; padding: 12px; margin: 10px 0; border-radius: 6px; cursor: pointer; text-align: left; font-size: 15px; transition: 0.2s; }
+        .btn-option:hover { background: #3a6073; transform: translateX(5px); }
+        .achievements { margin-top: 20px; font-size: 14px; color: #00ffcc; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <h2>📱 Симулятор ВСМ: Стресс-Тест</h2>
+    
+    <div class="stats">
+        <div>⭐ Баллы: <span id="points">0</span></div>
+        <div>😊 Лояльность: <div class="stat-bar-bg"><div id="loyalty-bar" class="stat-bar-fill" style="width: 50%;"></div></div></div>
+        <div>🛡️ Безопасность: <div class="stat-bar-bg"><div id="safety-bar" class="stat-bar-fill" style="width: 50%;"></div></div></div>
+    </div>
+
+    <div id="timer">⏱️ Осталось: 10 сек</div>
+    <div class="quest-text" id="scenario-text">Загрузка...</div>
+    <div id="options-container"></div>
+    <div class="achievements" id="achievements-list">🏅 Достижения: пока нет</div>
+</div>
+
+<script>
+// Данные игры
+const scenarios = {
+    start: {
+        text: "Пассажир бизнес-класса скандалит из-за того, что его кресло не раскладывается. Ваши действия?",
+        time: 12,
+        options: [
+            { text: "Извиниться, предложить кофе и перезагрузить модуль кресла.", loyalty: 20, safety: 0, points: 15, next: "success" },
+            { text: "Строго заявить, что ему придется подождать техников на конечной.", loyalty: -25, safety: -5, points: 0, next: "escalation" },
+            { text: "Оперативно переселить пассажира на свободное место.", loyalty: 15, safety: 0, points: 10, next: "success" }
+        ]
+    },
+    escalation: {
+        text: "Пассажир переходит на крик и мешает другим людям в вагоне. Время поджимает!",
+        time: 6,
+        options: [
+            { text: "Вызвать службу безопасности поезда и доложить начальнику.", loyalty: -5, safety: 30, points: 20, next: "end" },
+            { text: "Начать доказывать в ответ, что это не ваша вина.", loyalty: -40, safety: -20, points: -10, next: "end" }
+        ]
+    },
+    success: { text: "Конфликт исчерпан, пассажир доволен сервисом. Отличная работа!", time: 0, options: [] },
+    end: { text: "Инцидент локализован. Данные сохранены для отчета руководству.", time: 0, options: [] }
+};
+
+let state = { points: 0, loyalty: 50, safety: 50, current: "start", achievements: [] };
+let timerInterval;
+
+function updateUI() {
+    document.getElementById("points").innerText = state.points;
+    document.getElementById("loyalty-bar").style.width = state.loyalty + "%";
+    document.getElementById("safety-bar").style.width = state.safety + "%";
+    
+    let currentStep = scenarios[state.current];
+    document.getElementById("scenario-text").innerText = currentStep.text;
+    
+    let container = document.getElementById("options-container");
+    container.innerHTML = "";
+    
+    currentStep.options.forEach(opt => {
+        let btn = document.createElement("button");
+        btn.className = "btn-option";
+        btn.innerText = opt.text;
+        btn.onclick = () => selectOption(opt);
+        container.appendChild(btn);
+    });
+
+    if(state.safety >= 80 && !state.achievements.includes("Мастер Безопасности")) {
+        state.achievements.push("Мастер Безопасности");
+    }
+    document.getElementById("achievements-list").innerText = "🏅 Награды: " + (state.achievements.join(", ") || "нет");
+
+    startTimer(currentStep.time);
+}
+
+function startTimer(seconds) {
+    clearInterval(timerInterval);
+    if (seconds === 0) {
+        document.getElementById("timer").innerText = "Кейс завершен";
+        return;
+    }
+    let timeLeft = seconds;
+    document.getElementById("timer").innerText = `⏱️ Осталось: ${timeLeft} сек`;
+    
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        document.getElementById("timer").innerText = `⏱️ Осталось: ${timeLeft} сек`;
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            // Штраф за просрочку времени
+            state.loyalty = Math.max(0, state.loyalty - 15);
+            state.current = "end";
+            updateUI();
+        }
+    }, 1000);
+}
+
+function selectOption(opt) {
+    clearInterval(timerInterval);
+    state.points += opt.points;
+    state.loyalty = Math.max(0, Math.min(100, state.loyalty + opt.loyalty));
+    state.safety = Math.max(0, Math.min(100, state.safety + opt.safety));
+    state.current = opt.next;
+    updateUI();
+}
+
+// Старт игры
+updateUI();
+</script>
+</body>
+</html>
